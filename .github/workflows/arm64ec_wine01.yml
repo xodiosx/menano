@@ -385,6 +385,7 @@ jobs:
             --without-inotify \
             --with-xshm \
             --with-vkd3d \
+            --with-xinput --with-xinput2 \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
