@@ -10,7 +10,7 @@ jobs:
     - name: Checkout lsfg-vk repository
       uses: actions/checkout@v4
       with:
-        repository: PancakeTAS/lsfg-vk
+        repository: eugeniosegala/lsfg-vk-experimental
         ref: develop
         fetch-depth: 0
         submodules: recursive
@@ -44,10 +44,9 @@ jobs:
           -DCMAKE_STRIP="" \
           -DCMAKE_CXX_FLAGS="-fvisibility=default -DVOLK_IMPLEMENTATION" \
           -DCMAKE_C_FLAGS="-fvisibility=default" \
-          -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--export-dynamic -Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1" \
-          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--export-dynamic -Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
+          -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/lib/liblsfg-vk-layer.so"
 
+          
     - name: Build
       run: cmake --build build --parallel $(nproc)
 
