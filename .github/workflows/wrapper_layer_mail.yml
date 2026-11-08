@@ -72,6 +72,11 @@ jobs:
           cd $HOME/termuxfs/aarch64
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
+
+          cd $HOME/termuxfs/aarch64/data/data/com.termux/files
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz
+          tar xf wayland_scanner.tar.gz
+          rm wayland_scanner.tar.gz
           
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
@@ -113,6 +118,28 @@ jobs:
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
+
+      - name: Patch WSI for Android Bionic
+        run: |
+          cd mesa-src
+          python3 -c '
+          path = "src/vulkan/wsi/wsi_common_display.c"
+          with open(path, "r") as f:
+              lines = f.readlines()
+          
+          new_lines = []
+          patched_count = 0
+          for line in lines:
+              if "pthread_setcanceltype" in line:
+                  new_lines.append(f"// {line}")
+                  patched_count += 1
+              else:
+                  new_lines.append(line)
+          
+          with open(path, "w") as f:
+              f.writelines(new_lines)
+          print(f"Successfully commented out pthread_setcanceltype (Total: {patched_count})")
+          '
 
       - name: Configure Mesa
         run: |

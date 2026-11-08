@@ -1,0 +1,152 @@
+name: Build Box64 (Bionic)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-box64:
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - source: Official
+            type: Bionic
+
+    env:
+      ANDROID_NDK_VERSION: r27
+      API_LEVEL: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            python3-dev \
+            zlib1g-dev \
+            libzstd-dev
+
+      - name: Download Android NDK
+        run: |
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      - name: Clone Source
+        run: |
+          # ptitSeb 공식 소스 v0.4.4 브랜치만 깔끔하게 클론합니다.
+          git clone --branch v0.4.4 https://github.com/ptitSeb/box64 source
+          cd source
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+
+      - name: Get Version Info
+        id: version
+        run: |
+          cd source
+          COMMIT=$(git rev-parse --short HEAD)
+          
+          MAJOR=$(grep '#define BOX64_MAJOR' src/box64version.h | awk '{print $3}')
+          MINOR=$(grep '#define BOX64_MINOR' src/box64version.h | awk '{print $3}')
+          REVISION=$(grep '#define BOX64_REVISION' src/box64version.h | awk '{print $3}')
+          
+          echo "FULL_VERSION=Box64-${MAJOR}.${MINOR}.${REVISION}-${COMMIT}-${{ matrix.type }}" >> $GITHUB_ENV
+          echo "ARCHIVE_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}.tar.gz" >> $GITHUB_ENV
+
+      - name: Configure and Build
+        run: |
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
+          API_LEVEL=30
+
+          mkdir build && cd build
+          
+          CMAKE_ARGS="-DBIONIC=1 -DTERMUX=1 -DHAVE_TRACE=0"
+
+          export CFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
+          export CXXFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -landroid-shmem"
+
+          cmake ../source \
+            -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
+            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
+            -DCMAKE_SYSROOT=$SYSROOT \
+            -DANDROID=1 \
+            -DARM_DYNAREC=1 \
+            -DBAD_SIGNAL=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            $CMAKE_ARGS
+            
+          make -j$(nproc)
+          
+          readelf -d box64 | grep -q "NEEDED.*libc.so" || { echo "Linking failed!"; exit 1; }
+          
+          $TOOLCHAIN/llvm-strip box64
+
+      - name: Package Box64 into Tarball
+        run: |
+          mkdir -p package_dir
+          cp build/box64 package_dir/
+          
+          # tar.gz 파일 생성
+          tar -czf ${{ env.ARCHIVE_NAME }} -C package_dir box64
+
+      - name: Upload Box64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: box64-${{ matrix.source }}-${{ matrix.type }}-tarball
+          path: |
+            *.tar.gz
+          retention-days: 30
+
+      - name: Publish Box64 to GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          tag_name: release-${{ env.FULL_VERSION }}
+          name: Box64 ${{ matrix.source }} (${{ matrix.type }}) - ${{ env.FULL_VERSION }}
+          body: |
+            - **Source**: ${{ matrix.source }} (Official ptitSeb v0.4.4)
+            - **Type**: ${{ matrix.type }}
+            - **Target**: Android Bionic (Termux / NDK r27 / API 30)
+          files: |
+            ${{ env.ARCHIVE_NAME }}
+            
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

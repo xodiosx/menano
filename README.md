@@ -30,10 +30,7 @@ wine&dxvk
 ```sh
 curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install03 && chmod +x install03 && ./install03
 ```
-glibc&box64
-```sh
-curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
-```
+
 # run x11
 run openbox mode
 
@@ -112,7 +109,7 @@ If you install the Winlator pad DLL file and run this app through the wfm.exe fi
 
 [Wined3d](https://fdossena.com/?p=wined3d/index.frag)
 
-[MiceWine](https://github.com/KreitinnSoftware/MiceWine-Application)
+[MiceWine](https://github.com/KreitinnSoftware/MiceWine-Repository/releases)
 
 [Termux](https://github.com/termux/termux-app)
 

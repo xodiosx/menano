@@ -1,8 +1,8 @@
 diff --git a/server/unicode.c b/server/unicode.c
-index bb39b55e50c..9106835eb67 100644
+index b486431..afa72d1 100644
 --- a/server/unicode.c
 +++ b/server/unicode.c
-@@ -348,6 +348,15 @@ struct fd *load_intl_file(void)
+@@ -334,6 +334,15 @@ struct fd *load_intl_file(void)
                             FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT ))) break;
          free( path );
      }
